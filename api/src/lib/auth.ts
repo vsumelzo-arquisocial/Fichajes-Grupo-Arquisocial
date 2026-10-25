@@ -24,10 +24,22 @@ export interface UsuarioSesion {
   debeCambiarPassword: boolean;
 }
 
-function secreto(): string {
-  const s = process.env.JWT_SECRET;
-  if (!s || s.length < 32) throw new Error("JWT_SECRET no configurado o demasiado corto");
+let secretoCache: string | null = null;
+
+/** Clave de firma de sesiones: variable JWT_SECRET si existe; si no, la generada en BD (fich.Config). */
+async function secreto(): Promise<string> {
+  if (secretoCache) return secretoCache;
+  let s = process.env.JWT_SECRET ?? null;
+  if (!s) s = await leerConfig("JWT_SECRET");
+  if (!s || s.length < 32) throw new Error("JWT_SECRET no disponible o demasiado corto");
+  secretoCache = s;
   return s;
+}
+
+export async function leerConfig(clave: string): Promise<string | null> {
+  const pool = await getPool();
+  const r = await pool.request().input("c", sql.VarChar(50), clave).query("SELECT Valor FROM fich.Config WHERE Clave = @c");
+  return r.recordset[0]?.Valor ?? null;
 }
 
 export function validarPassword(pw: unknown): string | null {
@@ -44,8 +56,8 @@ export function validarEmail(email: unknown): email is string {
 
 export const hashPassword = (pw: string) => bcrypt.hash(pw, 12);
 
-export function crearToken(usuarioId: number, versionSesion: number): string {
-  return jwt.sign({ uid: usuarioId, v: versionSesion }, secreto(), { expiresIn: `${DURACION_SESION_H}h`, algorithm: "HS256" });
+export async function crearToken(usuarioId: number, versionSesion: number): Promise<string> {
+  return jwt.sign({ uid: usuarioId, v: versionSesion }, await secreto(), { expiresIn: `${DURACION_SESION_H}h`, algorithm: "HS256" });
 }
 
 export function cookieSesion(token: string) {
@@ -86,7 +98,7 @@ export async function usuarioDeSesion(req: HttpRequest): Promise<UsuarioSesion |
   if (!token) return null;
   let payload: any;
   try {
-    payload = jwt.verify(token, secreto(), { algorithms: ["HS256"] });
+    payload = jwt.verify(token, await secreto(), { algorithms: ["HS256"] });
   } catch {
     return null;
   }
@@ -161,7 +173,7 @@ export async function login(email: string, password: string): Promise<ResultadoL
 
   return {
     ok: true,
-    token: crearToken(u.UsuarioId, u.VersionSesion),
+    token: await crearToken(u.UsuarioId, u.VersionSesion),
     usuario: {
       usuarioId: u.UsuarioId,
       email: u.Email,
