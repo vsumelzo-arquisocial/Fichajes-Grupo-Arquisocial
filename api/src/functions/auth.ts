@@ -9,6 +9,7 @@ import {
   validarEmail,
   crearToken,
   ipCliente,
+  leerConfig,
 } from "../lib/auth";
 import { json, error, leerJson, conSesion, publico } from "../lib/http";
 import { auditar } from "../lib/auditoria";
@@ -23,7 +24,8 @@ app.http("setupEstado", {
   handler: publico(async () => {
     const pool = await getPool();
     const r = await pool.request().query("SELECT COUNT(*) AS n FROM fich.Usuarios");
-    return json(200, { necesitaSetup: r.recordset[0].n === 0 && !!process.env.SETUP_KEY });
+    const clave = process.env.SETUP_KEY || (await leerConfig("SETUP_KEY"));
+    return json(200, { necesitaSetup: r.recordset[0].n === 0 && !!clave });
   }),
 });
 
@@ -33,7 +35,7 @@ app.http("setup", {
   authLevel: "anonymous",
   route: "setup",
   handler: publico(async (req) => {
-    const claveEsperada = process.env.SETUP_KEY;
+    const claveEsperada = process.env.SETUP_KEY || (await leerConfig("SETUP_KEY"));
     if (!claveEsperada) return error(404, "No disponible");
     const b = await leerJson(req);
     if (!b) return error(400, "Datos no válidos");
@@ -71,6 +73,8 @@ app.http("setup", {
         );
       const id = r.recordset[0].UsuarioId;
       await auditar(id, "SETUP_ADMIN", "Usuario", id, b.email, ipCliente(req), tx);
+      // La clave de configuración es de un solo uso
+      await new sql.Request(tx).query("DELETE FROM fich.Config WHERE Clave = 'SETUP_KEY'");
       await tx.commit();
       return json(201, { ok: true });
     } catch (e) {
@@ -160,7 +164,7 @@ app.http("cambiarPassword", {
         );
       await auditar(u.usuarioId, "CAMBIO_PASSWORD", "Usuario", u.usuarioId, null, ipCliente(req));
       // Invalida otras sesiones y emite una nueva para esta
-      return json(200, { ok: true }, { cookies: [cookieSesion(crearToken(u.usuarioId, nuevaVersion))] });
+      return json(200, { ok: true }, { cookies: [cookieSesion(await crearToken(u.usuarioId, nuevaVersion))] });
     },
     { permitirCambioPendiente: true }
   ),
