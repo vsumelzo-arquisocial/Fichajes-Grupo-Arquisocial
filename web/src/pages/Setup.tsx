@@ -32,7 +32,7 @@ export default function Setup() {
       <div className="centrado">
         <div className="tarjeta form-login">
           <h1>Administrador creado</h1>
-          <p>Ya puedes iniciar sesión. Elimina ahora la variable <code>SETUP_KEY</code> de la configuración de la aplicación.</p>
+          <p>Ya puedes iniciar sesión. La clave de configuración se ha invalidado automáticamente.</p>
           <Link className="btn btn-primario" to="/">Ir al inicio de sesión</Link>
         </div>
       </div>
