@@ -1,0 +1,42 @@
+# Despliegue de la app de Fichajes en Azure Static Web Apps
+# Rama develop -> SWA de pruebas | Rama main -> SWA de producción
+# Variables secretas del pipeline (Pipelines > Edit > Variables):
+#   deployment_token_test : token de despliegue de swa-fichajes-test
+#   deployment_token_prod : token de despliegue de swa-fichajes-prod
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+    swaToken: $(deployment_token_prod)
+  ${{ else }}:
+    swaToken: $(deployment_token_test)
+
+steps:
+  - checkout: self
+
+  - task: NodeTool@0
+    inputs:
+      versionSpec: "20.x"
+    displayName: Node 20
+
+  - script: |
+      cd api
+      npm ci
+      npm test
+    displayName: Tests de la API
+
+  - task: AzureStaticWebApp@0
+    displayName: Desplegar en Static Web Apps
+    inputs:
+      app_location: "web"
+      api_location: "api"
+      output_location: "dist"
+      azure_static_web_apps_api_token: $(swaToken)
