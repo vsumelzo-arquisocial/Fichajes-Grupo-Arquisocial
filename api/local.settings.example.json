@@ -4,8 +4,6 @@
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "AzureWebJobsStorage": "",
     "SQL_CONNECTION_STRING": "Server=tcp:sql-fichajes-test-neu.database.windows.net,1433;Database=sqldb-fichajes-test;User ID=app_fichajes;Password=<CONTRASEÑA_APP>;Encrypt=true;TrustServerCertificate=false;Connection Timeout=60;",
-    "JWT_SECRET": "<cadena aleatoria de al menos 64 caracteres>",
-    "SETUP_KEY": "<clave de un solo uso para crear el primer administrador>",
     "TZ_APP": "Europe/Madrid"
   }
 }
